@@ -11,22 +11,55 @@ class Database:
     def __init__(self):
         self.db = None
         
+    def _ensure_db_initialized(self):
+        """Ensure database is initialized, raise error if not"""
+        if self.db is None:
+            raise RuntimeError("❌ Firebase database not initialized. Please check Firebase configuration.")
+        
     async def init_database(self):
         """Initialize Firebase connection"""
-        if not firebase_admin._apps:
-            # Initialize Firebase with service account key
-            if os.getenv('FIREBASE_SERVICE_ACCOUNT_KEY'):
-                # Use service account key from environment variable
-                service_account_info = json.loads(os.getenv('FIREBASE_SERVICE_ACCOUNT_KEY'))
-                cred = credentials.Certificate(service_account_info)
-            else:
-                # Use service account key file
-                cred = credentials.Certificate(os.getenv('FIREBASE_SERVICE_ACCOUNT_PATH', 'service-account-key.json'))
-            
-            firebase_admin.initialize_app(cred)
+        print("🔧 Starting Firebase initialization...")
         
-        self.db = firestore.client()
-        print("✅ Firebase initialized successfully")
+        try:
+            if not firebase_admin._apps:
+                # Initialize Firebase with service account key
+                if os.getenv('FIREBASE_SERVICE_ACCOUNT_KEY'):
+                    print("🔍 Found FIREBASE_SERVICE_ACCOUNT_KEY environment variable")
+                    try:
+                        service_account_info = json.loads(os.getenv('FIREBASE_SERVICE_ACCOUNT_KEY'))
+                        print("✅ Successfully parsed Firebase service account JSON")
+                        cred = credentials.Certificate(service_account_info)
+                    except json.JSONDecodeError as e:
+                        print(f"❌ Failed to parse Firebase service account JSON: {e}")
+                        raise
+                else:
+                    print("🔍 Using FIREBASE_SERVICE_ACCOUNT_PATH (fallback)")
+                    cred = credentials.Certificate(os.getenv('FIREBASE_SERVICE_ACCOUNT_PATH', 'service-account-key.json'))
+                
+                print("🔧 Initializing Firebase app...")
+                firebase_admin.initialize_app(cred)
+                print("✅ Firebase app initialized")
+            else:
+                print("✅ Firebase app already initialized")
+            
+            print("🔧 Creating Firestore client...")
+            self.db = firestore.client()
+            
+            # Test the connection
+            print("🔧 Testing Firestore connection...")
+            test_ref = self.db.collection('_test').document('test')
+            test_ref.set({'test': True})
+            print("✅ Firestore connection test successful")
+            
+            print("✅ Firebase initialized successfully")
+            
+        except Exception as e:
+            print(f"❌ Firebase initialization failed: {e}")
+            print(f"❌ Error type: {type(e).__name__}")
+            import traceback
+            print(f"❌ Full traceback: {traceback.format_exc()}")
+            self.db = None
+            raise
     
     async def create_order(self, user_id: int, username: str, quantity: int, total_price: float) -> str:
         """Create a new order"""
@@ -145,6 +178,8 @@ class Database:
     
     async def get_account_count(self) -> Dict[str, int]:
         """Get account statistics including reservations"""
+        self._ensure_db_initialized()
+        
         # Clean up expired reservations first
         await self.cleanup_expired_reservations()
         
@@ -282,6 +317,8 @@ class Database:
     
     async def cleanup_expired_reservations(self):
         """Remove expired reservations"""
+        self._ensure_db_initialized()
+        
         reservations_ref = self.db.collection('account_reservations')
         now = datetime.now()
         query = reservations_ref.where('status', '==', 'active').where('expires_at', '<', now)
