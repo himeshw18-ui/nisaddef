@@ -1,5 +1,8 @@
-# Optimized for Render hosting with Firebase (Python 3.11 compatible)
-discord.py>=2.3.2,<2.5.0
+# IMPORTANT: Requires Python 3.11 ONLY (NOT 3.13)
+# Python 3.13 breaks discord.py due to missing audioop module
+# Make sure runtime.txt specifies python-3.11.0
+
+discord.py==2.3.2
 python-dotenv==1.0.0
-aiohttp>=3.9.1,<4.0.0
-firebase-admin>=6.2.0,<7.0.0 
+aiohttp==3.9.1
+firebase-admin==6.2.0 
