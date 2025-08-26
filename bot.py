@@ -11,7 +11,7 @@ import os
 if sys.version_info >= (3, 13):
     print("❌ ERROR: Python 3.13+ detected!")
     print("❌ discord.py requires Python 3.11 due to audioop module removal in 3.13")
-    print("❌ Please use Python 3.11.9 as specified in runtime.txt")
+    print("❌ Please use Python 3.11 as specified in runtime.txt")
     print(f"❌ Current Python version: {sys.version}")
     sys.exit(1)
 elif sys.version_info < (3, 11):
