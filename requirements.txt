@@ -1,6 +1,6 @@
 # IMPORTANT: Requires Python 3.11 ONLY (NOT 3.13)
 # Python 3.13 breaks discord.py due to missing audioop module
-# Make sure runtime.txt specifies python-3.11.0
+# Make sure runtime.txt specifies python-3.11.9
 
 discord.py==2.3.2
 python-dotenv==1.0.0
