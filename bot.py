@@ -1,13 +1,21 @@
 #!/usr/bin/env python3
 """
 Discord Account Shop Bot
-Uses Python 3.11.11 via PYTHON_VERSION environment variable
+Compatible with Python 3.13+ via audioop workaround
 """
 
 import sys
 import os
 
 print(f"🐍 Python version: {sys.version}")
+
+# CRITICAL: Apply audioop fix for Python 3.13+ BEFORE importing discord
+if sys.version_info >= (3, 13):
+    print("🔧 Python 3.13+ detected - applying audioop compatibility fix...")
+    # Import our audioop fix before discord.py
+    import audioop_fix
+else:
+    print("✅ Python < 3.13 - no audioop fix needed")
 
 import discord
 from discord.ext import commands, tasks

@@ -1,5 +1,5 @@
 # Discord Account Shop Bot Requirements
-# Python 3.11.11 specified via PYTHON_VERSION environment variable
+# Compatible with Python 3.13+ via audioop workaround
 
 discord.py==2.3.2
 python-dotenv==1.0.0
