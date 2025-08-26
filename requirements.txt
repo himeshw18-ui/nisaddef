@@ -1,6 +1,5 @@
-# IMPORTANT: Requires Python 3.11 ONLY (NOT 3.13)
-# Python 3.13 breaks discord.py due to missing audioop module
-# runtime.txt specifies python-3.11 (latest 3.11.x available)
+# Discord Account Shop Bot Requirements
+# Python 3.11.11 specified via PYTHON_VERSION environment variable
 
 discord.py==2.3.2
 python-dotenv==1.0.0

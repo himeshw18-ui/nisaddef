@@ -1,26 +1,13 @@
 #!/usr/bin/env python3
 """
 Discord Account Shop Bot
-Requires Python 3.11 (NOT 3.13 - audioop module issue)
+Uses Python 3.11.11 via PYTHON_VERSION environment variable
 """
 
 import sys
 import os
 
-# CRITICAL: Check Python version before importing discord.py
-if sys.version_info >= (3, 13):
-    print("❌ ERROR: Python 3.13+ detected!")
-    print("❌ discord.py requires Python 3.11 due to audioop module removal in 3.13")
-    print("❌ Please use Python 3.11 as specified in runtime.txt")
-    print(f"❌ Current Python version: {sys.version}")
-    sys.exit(1)
-elif sys.version_info < (3, 11):
-    print("❌ ERROR: Python version too old!")
-    print("❌ This bot requires Python 3.11 or newer (but NOT 3.13)")
-    print(f"❌ Current Python version: {sys.version}")
-    sys.exit(1)
-
-print(f"✅ Python version OK: {sys.version}")
+print(f"🐍 Python version: {sys.version}")
 
 import discord
 from discord.ext import commands, tasks
