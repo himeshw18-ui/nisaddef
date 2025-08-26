@@ -17,6 +17,7 @@ if sys.version_info >= (3, 13):
 else:
     print("✅ Python < 3.13 - no audioop fix needed")
 
+print("📦 Importing Discord.py...")
 import discord
 from discord.ext import commands, tasks
 import asyncio
@@ -1277,27 +1278,42 @@ async def start_bot_with_server():
     """Start both Discord bot and HTTP server"""
     try:
         # Start HTTP server first
+        print("🌐 Starting HTTP server for Render...")
         await start_web_server()
+        print("✅ HTTP server started")
         
         # Start Discord bot
+        print(f"🤖 Connecting to Discord with token: {Config.DISCORD_TOKEN[:20]}...")
         await bot.start(Config.DISCORD_TOKEN)
         
     except Exception as e:
-        print(f"Error starting bot: {e}")
+        print(f"❌ Error starting bot: {e}")
+        import traceback
+        print(f"❌ Full traceback: {traceback.format_exc()}")
     finally:
         await payment_handler.close()
 
 if __name__ == "__main__":
     import os
     
+    print("🚀 Starting Discord Account Shop Bot...")
+    print(f"🔧 Discord Token: {'✅ SET' if Config.DISCORD_TOKEN else '❌ MISSING'}")
+    print(f"🔧 Guild ID: {Config.GUILD_ID}")
+    print(f"🔧 Admin Channel: {Config.ADMIN_CHANNEL_ID}")
+    print(f"🔧 Firebase Key: {'✅ SET' if Config.FIREBASE_SERVICE_ACCOUNT_KEY else '❌ MISSING'}")
+    
     try:
         Config.validate_config()
+        print("✅ Configuration validation passed")
         
         # Run bot with HTTP server for Render hosting
+        print("🚀 Starting bot with HTTP server...")
         asyncio.run(start_bot_with_server())
         
     except ValueError as e:
-        print(f"Configuration error: {e}")
+        print(f"❌ Configuration error: {e}")
         print("Please check your configuration in config.py")
     except Exception as e:
-        print(f"Error starting bot: {e}") 
+        print(f"❌ Error starting bot: {e}")
+        import traceback
+        print(f"❌ Full traceback: {traceback.format_exc()}") 
