@@ -404,25 +404,28 @@ class AdminApprovalView(discord.ui.View):
     
     @discord.ui.button(label='✅ Approve', style=discord.ButtonStyle.green, custom_id='admin_approve_order')
     async def approve_order(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != Config.ADMIN_USER_ID:
-            await interaction.response.send_message("❌ Only admin can approve orders.", ephemeral=True)
-            return
-        
-        # Get order details
-        order = await db.get_order(str(self.order_id))
-        if not order:
-            await interaction.response.send_message("❌ Order not found.", ephemeral=True)
-            return
-        
-        # Confirm the reservation and get the reserved accounts
-        confirmed_ids = await db.confirm_reservation(self.order_id, order['user_id'])
-        if not confirmed_ids:
-            await interaction.response.send_message("❌ No accounts were reserved for this order or reservation expired.", ephemeral=True)
-            return
-        
-        # Get the account details for the confirmed IDs using Firebase
-        accounts = []
         try:
+            debug_print(f"🔧 Admin approve button clicked by {interaction.user.id} for order {self.order_id}")
+            
+            if interaction.user.id != Config.ADMIN_USER_ID:
+                debug_print(f"❌ Non-admin user {interaction.user.id} tried to approve order")
+                await interaction.response.send_message("❌ Only admin can approve orders.", ephemeral=True)
+                return
+            
+            # Get order details
+            order = await db.get_order(str(self.order_id))
+            if not order:
+                await interaction.response.send_message("❌ Order not found.", ephemeral=True)
+                return
+            
+            # Confirm the reservation and get the reserved accounts
+            confirmed_ids = await db.confirm_reservation(str(self.order_id), order['user_id'])
+            if not confirmed_ids:
+                await interaction.response.send_message("❌ No accounts were reserved for this order or reservation expired.", ephemeral=True)
+                return
+            
+            # Get the account details for the confirmed IDs using Firebase
+            accounts = []
             for account_id in confirmed_ids:
                 account_doc = db.db.collection('accounts').document(account_id).get()
                 if account_doc.exists:
@@ -433,37 +436,59 @@ class AdminApprovalView(discord.ui.View):
             if not accounts:
                 await interaction.response.send_message("❌ Could not retrieve account details.", ephemeral=True)
                 return
+            
+            # Update order status to completed
+            await db.update_order_status(str(self.order_id), 'completed')
+            
+            # Create user channel and send accounts
+            await self.create_user_channel_and_deliver(interaction, order, accounts)
+            
+            # Update admin message
+            embed = discord.Embed(
+                title="✅ Order Approved & Completed",
+                description=f"Order #{self.order_id} has been approved and accounts delivered.",
+                color=discord.Color.green()
+            )
+            await interaction.response.edit_message(embed=embed, view=None)
+            
+            # Update shop message with new stock count
+            await update_shop_message(interaction.guild)
+            
         except Exception as e:
-            debug_print(f"❌ Error retrieving accounts: {e}")
-            await interaction.response.send_message("❌ Error retrieving account details.", ephemeral=True)
-            return
-        
-        # Update order status to completed
-        await db.update_order_status(str(self.order_id), 'completed')
-        
-        # Create user channel and send accounts
-        await self.create_user_channel_and_deliver(interaction, order, accounts)
-        
-        # Update admin message
-        embed = discord.Embed(
-            title="✅ Order Approved & Completed",
-            description=f"Order #{self.order_id} has been approved and accounts delivered.",
-            color=discord.Color.green()
-        )
-        await interaction.response.edit_message(embed=embed, view=None)
-        
-        # Update shop message with new stock count
-        await update_shop_message(interaction.guild)
+            debug_print(f"❌ Error in approve_order: {e}")
+            import traceback
+            debug_print(f"❌ Full traceback: {traceback.format_exc()}")
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message("❌ An error occurred while processing the approval. Please check logs.", ephemeral=True)
+                else:
+                    await interaction.followup.send("❌ An error occurred while processing the approval. Please check logs.", ephemeral=True)
+            except Exception as followup_error:
+                debug_print(f"❌ Could not send error message: {followup_error}")
     
     @discord.ui.button(label='❌ Reject', style=discord.ButtonStyle.red, custom_id='admin_reject_order')
     async def reject_order(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != Config.ADMIN_USER_ID:
-            await interaction.response.send_message("❌ Only admin can reject orders.", ephemeral=True)
-            return
-        
-        # Show rejection reason modal
-        modal = RejectionReasonModal(self.order_id, self.user_id)
-        await interaction.response.send_modal(modal)
+        try:
+            debug_print(f"🔧 Admin reject button clicked by {interaction.user.id} for order {self.order_id}")
+            
+            if interaction.user.id != Config.ADMIN_USER_ID:
+                debug_print(f"❌ Non-admin user {interaction.user.id} tried to reject order")
+                await interaction.response.send_message("❌ Only admin can reject orders.", ephemeral=True)
+                return
+            
+            # Show rejection reason modal
+            modal = RejectionReasonModal(self.order_id, self.user_id)
+            await interaction.response.send_modal(modal)
+            
+        except Exception as e:
+            debug_print(f"❌ Error in reject_order: {e}")
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message("❌ An error occurred while processing the rejection.", ephemeral=True)
+                else:
+                    await interaction.followup.send("❌ An error occurred while processing the rejection.", ephemeral=True)
+            except:
+                debug_print("❌ Could not send rejection error message")
     
     async def create_user_channel_and_deliver(self, interaction: discord.Interaction, order: dict, accounts: list):
         """Create a private channel for the user and deliver accounts"""
@@ -849,6 +874,7 @@ async def on_ready():
     # Add persistent views
     bot.add_view(PermanentPurchaseView())
     bot.add_view(TicketControlView())
+    # Note: AdminApprovalView is dynamically created per order, not persistent
     
     # Sync commands first
     try:
