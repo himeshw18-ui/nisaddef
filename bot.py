@@ -409,7 +409,7 @@ class AdminApprovalView(discord.ui.View):
             return
         
         # Get order details
-        order = await db.get_order(self.order_id)
+        order = await db.get_order(str(self.order_id))
         if not order:
             await interaction.response.send_message("❌ Order not found.", ephemeral=True)
             return
@@ -420,18 +420,26 @@ class AdminApprovalView(discord.ui.View):
             await interaction.response.send_message("❌ No accounts were reserved for this order or reservation expired.", ephemeral=True)
             return
         
-        # Get the account details for the confirmed IDs
-        async with aiosqlite.connect(db.db_path) as conn:
-            placeholders = ','.join('?' * len(confirmed_ids))
-            cursor = await conn.execute(f"""
-                SELECT * FROM accounts WHERE id IN ({placeholders})
-            """, confirmed_ids)
-            rows = await cursor.fetchall()
-            columns = [description[0] for description in cursor.description]
-            accounts = [dict(zip(columns, row)) for row in rows]
+        # Get the account details for the confirmed IDs using Firebase
+        accounts = []
+        try:
+            for account_id in confirmed_ids:
+                account_doc = db.db.collection('accounts').document(account_id).get()
+                if account_doc.exists:
+                    account_data = account_doc.to_dict()
+                    account_data['id'] = account_id
+                    accounts.append(account_data)
+            
+            if not accounts:
+                await interaction.response.send_message("❌ Could not retrieve account details.", ephemeral=True)
+                return
+        except Exception as e:
+            debug_print(f"❌ Error retrieving accounts: {e}")
+            await interaction.response.send_message("❌ Error retrieving account details.", ephemeral=True)
+            return
         
-        # Update order status
-        await db.update_order_status(self.order_id, 'completed', datetime.now().isoformat())
+        # Update order status to completed
+        await db.update_order_status(str(self.order_id), 'completed')
         
         # Create user channel and send accounts
         await self.create_user_channel_and_deliver(interaction, order, accounts)
