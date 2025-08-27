@@ -886,10 +886,8 @@ async def on_ready():
     # Reservations will NOT auto-expire - admin must manually approve/reject all orders
     print("ℹ️ Automatic reservation cleanup DISABLED - accounts stay reserved until admin acts")
     
-    # Start keep-alive task to prevent Render sleep
-    if not keep_alive_task.is_running():
-        keep_alive_task.start()
-        print("✅ Started keep-alive task (every 10 minutes)")
+    # Keep-alive handled by UptimeRobot - no Discord messages needed
+    print("✅ Bot keep-alive managed by UptimeRobot")
         
     print("🎯 Bot is ready! Shop is live and users can start purchasing!")
     
@@ -1252,27 +1250,6 @@ async def cleanup_expired_reservations():
     except Exception as e:
         print(f"Error in cleanup task: {e}")
 
-@tasks.loop(minutes=10)  # Keep bot alive every 10 minutes  
-async def keep_alive_task():
-    """Send a hidden message to admin channel to prevent Render sleep"""
-    try:
-        guild = bot.get_guild(Config.GUILD_ID)
-        if guild:
-            admin_channel = guild.get_channel(Config.ADMIN_CHANNEL_ID)
-            if admin_channel:
-                # Send a very discreet keep-alive message
-                embed = discord.Embed(
-                    description="🤖 Bot keep-alive ping",
-                    color=discord.Color.green()
-                )
-                embed.set_footer(text=f"⏰ {datetime.now().strftime('%H:%M:%S')}")
-                
-                # Send and auto-delete after 5 seconds  
-                msg = await admin_channel.send(embed=embed, delete_after=5)
-                print(f"✅ Keep-alive ping sent (deleted after 5s)")
-                
-    except Exception as e:
-        print(f"Warning: Keep-alive task failed: {e}")
 
 # Removed check_payments task to reduce server load
 # All payments are handled manually by admin
