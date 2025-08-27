@@ -962,11 +962,17 @@ async def on_ready():
     bot.add_view(TicketControlView())
     # Note: AdminApprovalView is dynamically created per order, not persistent
     
-    # Sync commands first
+    # Sync commands first - Guild sync for immediate availability
     try:
-        debug_print("🔄 Syncing slash commands...")
-        synced = await bot.tree.sync()
-        debug_print(f"✅ Synced {len(synced)} command(s)")
+        debug_print("🔄 Syncing slash commands to guild for immediate availability...")
+        guild = bot.get_guild(Config.GUILD_ID)
+        if guild:
+            synced = await bot.tree.sync(guild=guild)
+            debug_print(f"✅ Synced {len(synced)} command(s) to {guild.name} (immediate)")
+        else:
+            debug_print("⚠️ Guild not found, falling back to global sync (1 hour delay)")
+            synced = await bot.tree.sync()
+            debug_print(f"✅ Synced {len(synced)} command(s) globally (up to 1 hour)")
     except Exception as e:
         debug_print(f"❌ Failed to sync commands: {e}")
     
@@ -1579,6 +1585,56 @@ async def sync_commands(interaction: discord.Interaction, scope: str = "guild"):
             color=discord.Color.red()
         )
         await interaction.edit_original_response(embed=error_embed)
+        debug_print(f"❌ Command sync failed: {e}")
+
+@bot.command(name='sync')
+async def sync_text_command(ctx, scope: str = "guild"):
+    """Backup text command to sync slash commands - Admin only"""
+    if ctx.author.id != Config.ADMIN_USER_ID:
+        await ctx.send("❌ You don't have permission to use this command.")
+        return
+    
+    try:
+        synced_count = 0
+        if scope.lower() == "global":
+            synced = await bot.tree.sync()
+            synced_count = len(synced)
+            scope_text = "globally"
+        else:
+            synced = await bot.tree.sync(guild=ctx.guild)
+            synced_count = len(synced)
+            scope_text = f"to {ctx.guild.name}"
+        
+        embed = discord.Embed(
+            title="✅ Commands Synced",
+            description=f"Successfully synced **{synced_count}** commands {scope_text}!",
+            color=discord.Color.green()
+        )
+        
+        if synced:
+            command_names = [f"• `/{cmd.name}`" for cmd in synced]
+            embed.add_field(
+                name="📝 Synced Commands",
+                value="\n".join(command_names[:10]) + (f"\n... and {len(command_names)-10} more" if len(command_names) > 10 else ""),
+                inline=False
+            )
+        
+        embed.add_field(
+            name="⏱️ Availability",
+            value="Guild sync: **Immediate**\nGlobal sync: **Up to 1 hour**" if scope.lower() == "global" else "Commands should appear **immediately**",
+            inline=False
+        )
+        
+        await ctx.send(embed=embed)
+        debug_print(f"Admin synced {synced_count} commands {scope_text} via text command")
+        
+    except Exception as e:
+        error_embed = discord.Embed(
+            title="❌ Sync Failed",
+            description=f"Failed to sync commands: {str(e)}",
+            color=discord.Color.red()
+        )
+        await ctx.send(embed=error_embed)
         debug_print(f"❌ Command sync failed: {e}")
 
 async def send_accounts_to_user(user: discord.User, accounts: List[dict], order_id: int):
