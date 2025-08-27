@@ -914,7 +914,7 @@ def create_shop_embed(available_count, total_count=None):
     
     embed.add_field(
         name="💳 Payment Methods (Gift Cards Only)",
-        value="🛒 **Amazon Gift Cards** - Most Popular\n📱 **Google Play Cards** - Instant Processing\n💳 **Prepaid Visa/Mastercard** - Universal",
+        value="🛒 **Amazon Gift Cards ($, ₹)** - Most Popular\n📱 **Google Play Cards ($, ₹)** - Instant Processing\n💳 **Prepaid Visa/Mastercard ($, ₹)** - Universal\n\n💱 **Accepted Currencies:** USD ($) or Indian Rupees (₹) only",
         inline=False
     )
     
@@ -1099,7 +1099,7 @@ async def update_shop_message(guild):
             
             embed.add_field(
                 name="💳 Payment Methods (Gift Cards Only)",
-                value="🛒 **Amazon Gift Cards** - Most Popular\n📱 **Google Play Cards** - Instant Processing\n💳 **Prepaid Visa/Mastercard** - Universal",
+                value="🛒 **Amazon Gift Cards ($, ₹)** - Most Popular\n📱 **Google Play Cards ($, ₹)** - Instant Processing\n💳 **Prepaid Visa/Mastercard ($, ₹)** - Universal\n\n💱 **Accepted Currencies:** USD ($) or Indian Rupees (₹) only",
                 inline=False
             )
             
@@ -1144,7 +1144,7 @@ async def shop_command(interaction: discord.Interaction):
     
     embed.add_field(
         name="💳 Payment Methods (Gift Cards Only)",
-        value="🛒 **Amazon Gift Cards** - Most Popular\n📱 **Google Play Cards** - Instant Processing\n💳 **Prepaid Visa/Mastercard** - Universal",
+        value="🛒 **Amazon Gift Cards ($, ₹)** - Most Popular\n📱 **Google Play Cards ($, ₹)** - Instant Processing\n💳 **Prepaid Visa/Mastercard ($, ₹)** - Universal\n\n💱 **Accepted Currencies:** USD ($) or Indian Rupees (₹) only",
         inline=False
     )
     
@@ -1316,6 +1316,113 @@ async def complete_order_command(interaction: discord.Interaction, order_id: int
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
         
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Error: {str(e)}", ephemeral=True)
+
+@bot.tree.command(name="admin_chat", description="Send a message as the bot to any channel (Admin only)")
+async def admin_chat_command(interaction: discord.Interaction, channel: discord.TextChannel, message: str):
+    """Allow admin to send messages as the bot to any channel"""
+    if interaction.user.id != Config.ADMIN_USER_ID:
+        await interaction.response.send_message("❌ You don't have permission to use this command.", ephemeral=True)
+        return
+    
+    try:
+        # Send the message to the specified channel
+        await channel.send(message)
+        
+        # Confirm to admin
+        embed = discord.Embed(
+            title="✅ Message Sent",
+            description=f"Successfully sent message to {channel.mention}",
+            color=discord.Color.green()
+        )
+        embed.add_field(name="Channel", value=f"{channel.name} ({channel.id})", inline=True)
+        embed.add_field(name="Message", value=f"```{message[:500]}{'...' if len(message) > 500 else ''}```", inline=False)
+        
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        debug_print(f"Admin {interaction.user} sent message to #{channel.name}: {message[:100]}...")
+        
+    except discord.Forbidden:
+        await interaction.response.send_message(f"❌ No permission to send messages in {channel.mention}", ephemeral=True)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Error: {str(e)}", ephemeral=True)
+
+@bot.tree.command(name="send_instructions", description="Send purchase instructions to announcement channel (Admin only)")
+async def send_instructions_command(interaction: discord.Interaction, channel: discord.TextChannel = None):
+    """Send comprehensive instructions for account purchase through the bot"""
+    if interaction.user.id != Config.ADMIN_USER_ID:
+        await interaction.response.send_message("❌ You don't have permission to use this command.", ephemeral=True)
+        return
+    
+    try:
+        # Use provided channel or current channel
+        target_channel = channel if channel else interaction.channel
+        
+        # Create comprehensive instructions embed
+        embed = discord.Embed(
+            title="📋 How to Purchase Accounts - Complete Guide",
+            description="Follow these simple steps to purchase accounts through our automated bot system:",
+            color=discord.Color.blue()
+        )
+        
+        embed.add_field(
+            name="🚀 Step 1: Start Purchase",
+            value="• Look for the **shop message** with purchase buttons\n• Click on your desired quantity (2, 5, 10, or Custom)\n• A **private ticket** will be created for you automatically",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="🎁 Step 2: Prepare Gift Card",
+            value="• Get a **gift card** in **USD ($)** or **Indian Rupees (₹)**\n• Accepted: Amazon, Google Play, Prepaid Visa/Mastercard\n• Make sure the card has sufficient balance for your order",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="💳 Step 3: Submit Payment",
+            value="• In your **private ticket**, you'll see a **gift card form**\n• Fill in:\n  - Gift card type (Amazon/Google Play/etc.)\n  - Complete gift card code\n• Submit the form and wait for admin approval",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="✅ Step 4: Get Your Accounts",
+            value="• Admin will **verify your gift card** (usually within minutes)\n• Once approved, accounts are **delivered instantly**\n• You'll receive accounts in a **private channel** + **DM backup**\n• Each account includes email and password",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="💡 Important Tips",
+            value="• **Only gift cards accepted** - no crypto, PayPal, etc.\n• **USD ($) or Indian Rupees (₹)** only\n• Keep your **gift card receipt** until order is completed\n• Check your **DMs** for account delivery notifications",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="🆘 Need Help?",
+            value="• **Bot not responding?** Try again in a few minutes\n• **Gift card rejected?** Double-check the code and try again\n• **Other issues?** Message admin directly\n• All purchases are **manually verified** for security",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="🤖 How to Interact with Bot",
+            value="• **Click buttons** on the shop message to start\n• **Fill forms** when prompted\n• **Wait for notifications** in your private ticket\n• **Check DMs** for delivery confirmations",
+            inline=False
+        )
+        
+        embed.set_footer(text="🚀 Automated system • 🔐 Secure payments • 💬 24/7 support")
+        
+        # Send to target channel
+        await target_channel.send(embed=embed)
+        
+        # Confirm to admin
+        confirm_embed = discord.Embed(
+            title="✅ Instructions Sent",
+            description=f"Purchase instructions have been sent to {target_channel.mention}",
+            color=discord.Color.green()
+        )
+        await interaction.response.send_message(embed=confirm_embed, ephemeral=True)
+        debug_print(f"Admin sent purchase instructions to #{target_channel.name}")
+        
+    except discord.Forbidden:
+        await interaction.response.send_message(f"❌ No permission to send messages in {target_channel.mention}", ephemeral=True)
     except Exception as e:
         await interaction.response.send_message(f"❌ Error: {str(e)}", ephemeral=True)
 
