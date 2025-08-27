@@ -885,6 +885,11 @@ async def on_ready():
     # Background tasks disabled per user request
     # Reservations will NOT auto-expire - admin must manually approve/reject all orders
     print("ℹ️ Automatic reservation cleanup DISABLED - accounts stay reserved until admin acts")
+    
+    # Start keep-alive task to prevent Render sleep
+    if not keep_alive_task.is_running():
+        keep_alive_task.start()
+        print("✅ Started keep-alive task (every 10 minutes)")
         
     print("🎯 Bot is ready! Shop is live and users can start purchasing!")
     
@@ -1247,20 +1252,51 @@ async def cleanup_expired_reservations():
     except Exception as e:
         print(f"Error in cleanup task: {e}")
 
+@tasks.loop(minutes=10)  # Keep bot alive every 10 minutes  
+async def keep_alive_task():
+    """Send a hidden message to admin channel to prevent Render sleep"""
+    try:
+        guild = bot.get_guild(Config.GUILD_ID)
+        if guild:
+            admin_channel = guild.get_channel(Config.ADMIN_CHANNEL_ID)
+            if admin_channel:
+                # Send a very discreet keep-alive message
+                embed = discord.Embed(
+                    description="🤖 Bot keep-alive ping",
+                    color=discord.Color.green()
+                )
+                embed.set_footer(text=f"⏰ {datetime.now().strftime('%H:%M:%S')}")
+                
+                # Send and auto-delete after 5 seconds  
+                msg = await admin_channel.send(embed=embed, delete_after=5)
+                print(f"✅ Keep-alive ping sent (deleted after 5s)")
+                
+    except Exception as e:
+        print(f"Warning: Keep-alive task failed: {e}")
+
 # Removed check_payments task to reduce server load
 # All payments are handled manually by admin
 
 # Keep-alive HTTP server for Render hosting
 async def health_check(request):
     """Health check endpoint to keep Render awake"""
-    stats = await db.get_account_count()
-    return web.json_response({
-        "status": "Bot is alive and running!",
-        "bot_user": str(bot.user) if bot.user else "Not connected",
-        "available_accounts": stats.get('available', 0),
-        "total_accounts": stats.get('total', 0),
-        "timestamp": datetime.now().isoformat()
-    })
+    try:
+        stats = await db.get_account_count()
+        return web.json_response({
+            "status": "Bot is alive and running!",
+            "bot_user": str(bot.user) if bot.user else "Not connected",
+            "available_accounts": stats.get('available', 0),
+            "total_accounts": stats.get('total', 0),
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception:
+        # Firebase not ready yet, return basic health check
+        return web.json_response({
+            "status": "Bot is alive and running!",
+            "bot_user": str(bot.user) if bot.user else "Connecting...",
+            "note": "Database initializing...",
+            "timestamp": datetime.now().isoformat()
+        })
 
 async def start_web_server():
     """Start HTTP server for keep-alive"""
@@ -1286,9 +1322,25 @@ async def start_bot_with_server():
         await start_web_server()
         debug_print("✅ HTTP server started")
         
-        # Start Discord bot
+        # Start Discord bot with timeout
         debug_print(f"🤖 Connecting to Discord with token: {Config.DISCORD_TOKEN[:20]}...")
-        await bot.start(Config.DISCORD_TOKEN)
+        
+        try:
+            # Add timeout to prevent hanging
+            await asyncio.wait_for(bot.start(Config.DISCORD_TOKEN), timeout=30.0)
+            debug_print("✅ Discord bot connected successfully!")
+        except asyncio.TimeoutError:
+            debug_print("❌ TIMEOUT: Discord connection took longer than 30 seconds")
+            debug_print("❌ This suggests network issues or invalid Discord token")
+            raise
+        except discord.LoginFailure:
+            debug_print("❌ INVALID DISCORD TOKEN: Authentication failed")
+            debug_print(f"❌ Token used: {Config.DISCORD_TOKEN[:20]}...")
+            raise
+        except Exception as discord_error:
+            debug_print(f"❌ Discord connection failed: {discord_error}")
+            debug_print(f"❌ Error type: {type(discord_error).__name__}")
+            raise
         
     except Exception as e:
         debug_print(f"❌ Error starting bot: {e}")
