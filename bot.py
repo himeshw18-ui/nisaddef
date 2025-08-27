@@ -516,6 +516,12 @@ class AdminApprovalView(discord.ui.View):
             
             print(f"Found user: {user.name} ({user.id})")
             
+            # Set user_ping for notifications (same logic as rejection flow)
+            if hasattr(user, 'guild') and user in guild.members:
+                user_ping = user.mention
+            else:
+                user_ping = f"**{user.name}**"
+            
             # Add admin to permissions
             admin_user = guild.get_member(Config.ADMIN_USER_ID)
             overwrites = {
