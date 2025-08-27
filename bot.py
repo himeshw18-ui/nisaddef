@@ -7,17 +7,25 @@ Compatible with Python 3.13+ via audioop workaround
 import sys
 import os
 
-print(f"🐍 Python version: {sys.version}")
+# Force flush prints for Render logging
+def debug_print(msg):
+    print(msg)
+    sys.stdout.flush()
+
+debug_print(f"🐍 Python version: {sys.version}")
+debug_print(f"🔧 Script started at: {__file__}")
+debug_print(f"🔧 Current working directory: {os.getcwd()}")
+debug_print(f"🔧 Python executable: {sys.executable}")
 
 # CRITICAL: Apply audioop fix for Python 3.13+ BEFORE importing discord
 if sys.version_info >= (3, 13):
-    print("🔧 Python 3.13+ detected - applying audioop compatibility fix...")
+    debug_print("🔧 Python 3.13+ detected - applying audioop compatibility fix...")
     # Import our audioop fix before discord.py
     import audioop_fix
 else:
-    print("✅ Python < 3.13 - no audioop fix needed")
+    debug_print("✅ Python < 3.13 - no audioop fix needed")
 
-print("📦 Importing Discord.py...")
+debug_print("📦 Importing Discord.py...")
 import discord
 from discord.ext import commands, tasks
 import asyncio
@@ -874,13 +882,9 @@ async def on_ready():
     except Exception as e:
         print(f"❌ Error setting up shop: {e}")
     
-    # Start background tasks (optimized for low resource usage)
-    try:
-        if not cleanup_expired_reservations.is_running():
-            cleanup_expired_reservations.start()
-            print("✅ Started reservation cleanup task (every 5 minutes)")
-    except Exception as e:
-        print(f"Warning: Could not start background tasks: {e}")
+    # Background tasks disabled per user request
+    # Reservations will NOT auto-expire - admin must manually approve/reject all orders
+    print("ℹ️ Automatic reservation cleanup DISABLED - accounts stay reserved until admin acts")
         
     print("🎯 Bot is ready! Shop is live and users can start purchasing!")
     
@@ -1278,42 +1282,50 @@ async def start_bot_with_server():
     """Start both Discord bot and HTTP server"""
     try:
         # Start HTTP server first
-        print("🌐 Starting HTTP server for Render...")
+        debug_print("🌐 Starting HTTP server for Render...")
         await start_web_server()
-        print("✅ HTTP server started")
+        debug_print("✅ HTTP server started")
         
         # Start Discord bot
-        print(f"🤖 Connecting to Discord with token: {Config.DISCORD_TOKEN[:20]}...")
+        debug_print(f"🤖 Connecting to Discord with token: {Config.DISCORD_TOKEN[:20]}...")
         await bot.start(Config.DISCORD_TOKEN)
         
     except Exception as e:
-        print(f"❌ Error starting bot: {e}")
+        debug_print(f"❌ Error starting bot: {e}")
         import traceback
-        print(f"❌ Full traceback: {traceback.format_exc()}")
+        debug_print(f"❌ Full traceback: {traceback.format_exc()}")
     finally:
         await payment_handler.close()
 
 if __name__ == "__main__":
     import os
     
-    print("🚀 Starting Discord Account Shop Bot...")
-    print(f"🔧 Discord Token: {'✅ SET' if Config.DISCORD_TOKEN else '❌ MISSING'}")
-    print(f"🔧 Guild ID: {Config.GUILD_ID}")
-    print(f"🔧 Admin Channel: {Config.ADMIN_CHANNEL_ID}")
-    print(f"🔧 Firebase Key: {'✅ SET' if Config.FIREBASE_SERVICE_ACCOUNT_KEY else '❌ MISSING'}")
+    debug_print("🚀 Starting Discord Account Shop Bot...")
+    debug_print(f"🔧 Discord Token: {'✅ SET' if Config.DISCORD_TOKEN else '❌ MISSING'}")
+    debug_print(f"🔧 Guild ID: {Config.GUILD_ID}")
+    debug_print(f"🔧 Admin Channel: {Config.ADMIN_CHANNEL_ID}")
+    debug_print(f"🔧 Firebase Key: {'✅ SET' if Config.FIREBASE_SERVICE_ACCOUNT_KEY else '❌ MISSING'}")
+    
+    # More detailed checks
+    if not Config.DISCORD_TOKEN:
+        debug_print("❌ CRITICAL: Discord token is missing!")
+    if not Config.GUILD_ID:
+        debug_print("❌ CRITICAL: Guild ID is missing!")
+    if not Config.FIREBASE_SERVICE_ACCOUNT_KEY:
+        debug_print("❌ CRITICAL: Firebase key is missing!")
     
     try:
         Config.validate_config()
-        print("✅ Configuration validation passed")
+        debug_print("✅ Configuration validation passed")
         
         # Run bot with HTTP server for Render hosting
-        print("🚀 Starting bot with HTTP server...")
+        debug_print("🚀 Starting bot with HTTP server...")
         asyncio.run(start_bot_with_server())
         
     except ValueError as e:
-        print(f"❌ Configuration error: {e}")
-        print("Please check your configuration in config.py")
+        debug_print(f"❌ Configuration error: {e}")
+        debug_print("Please check your configuration in config.py")
     except Exception as e:
-        print(f"❌ Error starting bot: {e}")
+        debug_print(f"❌ Error starting bot: {e}")
         import traceback
-        print(f"❌ Full traceback: {traceback.format_exc()}") 
+        debug_print(f"❌ Full traceback: {traceback.format_exc()}") 
