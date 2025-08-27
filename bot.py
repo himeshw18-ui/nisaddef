@@ -866,9 +866,9 @@ async def on_ready():
                 
                 # Get current account count
                 try:
-                    all_accounts = await db.get_all_accounts()
-                    available_count = sum(1 for acc in all_accounts if not acc.get('reserved_by'))
-                    total_count = len(all_accounts)
+                    stats = await db.get_account_count()
+                    available_count = stats['available']
+                    total_count = stats['total']
                 except Exception as e:
                     debug_print(f"⚠️ Could not get account count: {e}")
                     available_count = "?"
@@ -1265,24 +1265,25 @@ async def send_accounts_to_user(user: discord.User, accounts: List[dict], order_
             )
             await admin_channel.send(embed=embed)
 
-@tasks.loop(minutes=5)  # Reduced frequency to save resources
-async def cleanup_expired_reservations():
-    """Background task to clean up expired reservations and update shop"""
-    try:
-        # Clean up expired reservations
-        old_count = await db.get_account_count()
-        await db.cleanup_expired_reservations()
-        new_count = await db.get_account_count()
-        
-        # Only update shop message if counts actually changed
-        if old_count != new_count:
-            guild = bot.get_guild(Config.GUILD_ID)
-            if guild:
-                await update_shop_message(guild)
-                debug_print(f"Updated shop: {old_count['available']} → {new_count['available']} available")
-            
-    except Exception as e:
-        debug_print(f"Error in cleanup task: {e}")
+# DISABLED: 5-minute cleanup task per user request
+# @tasks.loop(minutes=5)  # Reduced frequency to save resources
+# async def cleanup_expired_reservations():
+#     """Background task to clean up expired reservations and update shop"""
+#     try:
+#         # Clean up expired reservations
+#         old_count = await db.get_account_count()
+#         await db.cleanup_expired_reservations()
+#         new_count = await db.get_account_count()
+#         
+#         # Only update shop message if counts actually changed
+#         if old_count != new_count:
+#             guild = bot.get_guild(Config.GUILD_ID)
+#             if guild:
+#                 await update_shop_message(guild)
+#                 debug_print(f"Updated shop: {old_count['available']} → {new_count['available']} available")
+#             
+#     except Exception as e:
+#         debug_print(f"Error in cleanup task: {e}")
 
 
 # Removed check_payments task to reduce server load
