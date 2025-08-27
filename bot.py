@@ -1302,21 +1302,34 @@ async def start_bot_with_server():
         # Start Discord bot with timeout
         debug_print(f"🤖 Connecting to Discord with token: {Config.DISCORD_TOKEN[:20]}...")
         
+        # Add more debugging for connection issues
+        debug_print("🔍 Attempting Discord connection...")
+        debug_print(f"🔧 Bot intents: {bot.intents}")
+        debug_print(f"🔧 Bot prefix: {bot.command_prefix}")
+        
         try:
-            # Add timeout to prevent hanging
-            await asyncio.wait_for(bot.start(Config.DISCORD_TOKEN), timeout=30.0)
+            # Add timeout to prevent hanging - increased for Render network issues
+            await asyncio.wait_for(bot.start(Config.DISCORD_TOKEN), timeout=60.0)
             debug_print("✅ Discord bot connected successfully!")
         except asyncio.TimeoutError:
-            debug_print("❌ TIMEOUT: Discord connection took longer than 30 seconds")
+            debug_print("❌ TIMEOUT: Discord connection took longer than 60 seconds")
             debug_print("❌ This suggests network issues or invalid Discord token")
+            debug_print("❌ Check: 1) Token validity 2) Bot still in server 3) Network connectivity")
             raise
-        except discord.LoginFailure:
+        except discord.LoginFailure as e:
             debug_print("❌ INVALID DISCORD TOKEN: Authentication failed")
             debug_print(f"❌ Token used: {Config.DISCORD_TOKEN[:20]}...")
+            debug_print(f"❌ Login error: {e}")
+            raise
+        except discord.HTTPException as e:
+            debug_print(f"❌ Discord HTTP error: {e}")
+            debug_print(f"❌ Status: {e.status}, Response: {e.response}")
             raise
         except Exception as discord_error:
             debug_print(f"❌ Discord connection failed: {discord_error}")
             debug_print(f"❌ Error type: {type(discord_error).__name__}")
+            import traceback
+            debug_print(f"❌ Connection traceback: {traceback.format_exc()}")
             raise
         
     except Exception as e:

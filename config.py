@@ -54,6 +54,16 @@ class Config:
             if not field_value or field_value in ['YOUR_BOT_TOKEN_HERE', 0]:
                 missing.append(field_name)
         
+        # Validate Discord token format
+        if cls.DISCORD_TOKEN:
+            # Discord bot tokens should be base64-encoded and contain periods
+            if len(cls.DISCORD_TOKEN) < 50 or '.' not in cls.DISCORD_TOKEN:
+                raise ValueError("DISCORD_TOKEN appears to be invalid format. Should be ~70 characters with dots.")
+            
+            # Check if it looks like a user token instead of bot token
+            if not any(char.isdigit() for char in cls.DISCORD_TOKEN.split('.')[0]):
+                raise ValueError("DISCORD_TOKEN might be a user token instead of bot token. Use bot token from Discord Developer Portal.")
+        
         # Check Firebase configuration
         if not cls.FIREBASE_SERVICE_ACCOUNT_KEY and not cls.FIREBASE_SERVICE_ACCOUNT_PATH:
             missing.append('FIREBASE_SERVICE_ACCOUNT_KEY or FIREBASE_SERVICE_ACCOUNT_PATH')
