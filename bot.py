@@ -297,9 +297,9 @@ class GiftCardModal(discord.ui.Modal, title='Gift Card Payment'):
             self.total_price
         )
         
-        # Reserve accounts for 10 minutes
+        # Reserve accounts for 2 hours (plenty of time for admin approval)
         from datetime import datetime, timedelta
-        expires_at = (datetime.now() + timedelta(minutes=10)).isoformat()
+        expires_at = (datetime.now() + timedelta(hours=2)).isoformat()
         reserved_ids = await db.reserve_accounts(order_id, self.quantity, expires_at)
         
         if not reserved_ids:
