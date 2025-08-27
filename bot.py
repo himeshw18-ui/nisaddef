@@ -693,9 +693,54 @@ class RejectionReasonModal(discord.ui.Modal, title='Rejection Reason'):
         # Create user channel to explain rejection
         guild = interaction.guild
         category = discord.utils.get(guild.categories, id=Config.TICKET_CATEGORY_ID)
-        user = guild.get_member(self.user_id)
         
-        if user:
+        # Try to get user - first as guild member, then as Discord user
+        user = guild.get_member(self.user_id)
+        if not user:
+            try:
+                user = await guild.fetch_member(self.user_id)
+            except:
+                try:
+                    # User not in guild, but we can still DM them
+                    user = await bot.fetch_user(self.user_id)
+                except:
+                    print(f"Could not find user {self.user_id} for rejection notification")
+                    # Update admin message and exit
+                    embed = discord.Embed(
+                        title="❌ Order Rejected",
+                        description=f"Order #{self.order_id} has been rejected, but user {self.user_id} could not be found for notification.\nReason: {self.reason.value}",
+                        color=discord.Color.red()
+                    )
+                    await interaction.response.edit_message(embed=embed, view=None)
+                    return
+        
+        # Send DM notification first (works even if user left guild)
+        try:
+            dm_embed = discord.Embed(
+                title="❌ Order Rejected",
+                description=f"Your order #{self.order_id} has been rejected.",
+                color=discord.Color.red()
+            )
+            dm_embed.add_field(name="Reason", value=self.reason.value, inline=False)
+            dm_embed.add_field(
+                name="What to do next:",
+                value="• Check your gift card code\n• Try with a different gift card\n• Contact admin if you have questions",
+                inline=False
+            )
+            
+            await user.send(embed=dm_embed)
+            print(f"Sent rejection DM notification to {user.name}")
+            dm_sent = True
+            
+        except discord.Forbidden:
+            print(f"Could not send rejection DM to {user.name}: DMs disabled")
+            dm_sent = False
+        except Exception as dm_error:
+            print(f"Could not send rejection DM to {user.name}: {dm_error}")
+            dm_sent = False
+        
+        # Only create channel if user is still in guild
+        if hasattr(user, 'guild') and user in guild.members:
             # Create permissions similar to delivery channel
             admin_user = guild.get_member(Config.ADMIN_USER_ID)
             overwrites = {
@@ -741,6 +786,12 @@ class RejectionReasonModal(discord.ui.Modal, title='Rejection Reason'):
             
             await user_channel.send(f"❌ Hello {user_ping}, unfortunately your order was rejected:", embed=rejection_embed)
             
+            # Add DM status to rejection channel
+            if dm_sent:
+                await user_channel.send(f"📱 **Note:** A rejection notification has also been sent to your DMs.")
+            else:
+                await user_channel.send(f"📝 **Note:** Could not send DM notification. Please check this channel for rejection details.")
+            
             # Add close button
             close_embed = discord.Embed(
                 title="🎫 Channel Controls",
@@ -749,13 +800,23 @@ class RejectionReasonModal(discord.ui.Modal, title='Rejection Reason'):
             )
             close_view = TicketControlView()
             await user_channel.send(embed=close_embed, view=close_view)
+        else:
+            # User is not in guild - DM was sent but no channel created
+            print(f"User {user.name} not in guild - rejection channel not created, DM sent instead")
         
         # Update admin message
+        dm_status = "✅ DM sent" if dm_sent else "❌ DM failed"
         embed = discord.Embed(
             title="❌ Order Rejected",
             description=f"Order #{self.order_id} has been rejected.\nReason: {self.reason.value}",
             color=discord.Color.red()
         )
+        embed.add_field(name="User Notification", value=f"{dm_status} to {user.name}", inline=True)
+        if hasattr(user, 'guild') and user in guild.members:
+            embed.add_field(name="Rejection Channel", value="✅ Created", inline=True)
+        else:
+            embed.add_field(name="Rejection Channel", value="❌ Not created (user not in guild)", inline=True)
+        
         await interaction.response.edit_message(embed=embed, view=None)
 
 class PaymentMethodView(discord.ui.View):
