@@ -795,12 +795,48 @@ class TicketControlView(discord.ui.View):
         await asyncio.sleep(10)
         await interaction.channel.delete()
 
+def create_shop_embed(available_count, total_count=None):
+    """Create a standardized shop embed"""
+    embed = discord.Embed(
+        title="🛒 Curso Pro Account Shop - Live",
+        description="Click the buttons below to purchase accounts instantly!",
+        color=discord.Color.green()
+    )
+    embed.add_field(name="💰 Price per Account", value=f"${Config.ACCOUNT_PRICE:.2f}", inline=True)
+    embed.add_field(name="📦 Available Stock", value=f"{available_count} accounts", inline=True)
+    embed.add_field(name="⚡ Status", value="🟢 Online & Ready", inline=True)
+    
+    embed.add_field(
+        name="🔥 Purchase Options",
+        value="• **2 Accounts** - $1.00 (Minimum)\n• **5 Accounts** - $2.50\n• **10 Accounts** - $5.00\n• **Custom Amount** - 2+ accounts only",
+        inline=False
+    )
+    
+    embed.add_field(
+        name="💳 Payment Methods (Gift Cards Only)",
+        value="🛒 **Amazon Gift Cards** - Most Popular\n📱 **Google Play Cards** - Instant Processing\n💳 **Prepaid Visa/Mastercard** - Universal",
+        inline=False
+    )
+    
+    embed.add_field(
+        name="📋 Process",
+        value="1️⃣ Click purchase button\n2️⃣ Private ticket created\n3️⃣ Send payment\n4️⃣ Accounts delivered to DM",
+        inline=False
+    )
+    
+    embed.set_footer(text="🚀 Instant delivery • 🔐 Anonymous payments • 💬 24/7 support")
+    
+    return embed
+
 @bot.event
 async def on_ready():
-    print(f'{bot.user} has logged in!')
+    start_time = asyncio.get_event_loop().time()
+    debug_print(f'{bot.user} has logged in!')
     
     # Initialize Firebase database
+    debug_print("🔧 Starting Firebase initialization...")
     await db.init_database()
+    debug_print("✅ Firebase initialized successfully")
     
     # Add persistent views
     bot.add_view(PermanentPurchaseView())
@@ -808,10 +844,11 @@ async def on_ready():
     
     # Sync commands first
     try:
+        debug_print("🔄 Syncing slash commands...")
         synced = await bot.tree.sync()
-        print(f"✅ Synced {len(synced)} command(s)")
+        debug_print(f"✅ Synced {len(synced)} command(s)")
     except Exception as e:
-        print(f"❌ Failed to sync commands: {e}")
+        debug_print(f"❌ Failed to sync commands: {e}")
     
     # Auto-post shop message to order-ticket channel
     try:
@@ -820,82 +857,74 @@ async def on_ready():
             # Look for the order-ticket channel
             shop_channel = None
             for channel in guild.text_channels:
-                if "order-ticket" in channel.name.lower():
+                if Config.SHOP_CHANNEL_NAME in channel.name.lower():
                     shop_channel = channel
                     break
             
             if shop_channel:
-                print(f"Found order-ticket channel: {shop_channel.name}")
+                debug_print(f"Found {Config.SHOP_CHANNEL_NAME} channel: {shop_channel.name}")
                 
-                # Post shop message
-                stats = await db.get_account_count()
+                # Get current account count
+                try:
+                    all_accounts = await db.get_all_accounts()
+                    available_count = sum(1 for acc in all_accounts if not acc.get('reserved_by'))
+                    total_count = len(all_accounts)
+                except Exception as e:
+                    debug_print(f"⚠️ Could not get account count: {e}")
+                    available_count = "?"
+                    total_count = "?"
                 
-                embed = discord.Embed(
-                    title="🛒 Curso Pro Account Shop - Live",
-                    description="Click the buttons below to purchase accounts instantly!",
-                    color=discord.Color.green()
-                )
-                embed.add_field(name="💰 Price per Account", value=f"${Config.ACCOUNT_PRICE:.2f}", inline=True)
-                embed.add_field(name="📦 Available Stock", value=f"{stats['available']} accounts", inline=True)
-                embed.add_field(name="⚡ Status", value="🟢 Online & Ready", inline=True)
-                
-                embed.add_field(
-                    name="🔥 Purchase Options",
-                    value="• **2 Accounts** - $1.00 (Minimum)\n• **5 Accounts** - $2.50\n• **10 Accounts** - $5.00\n• **Custom Amount** - 2+ accounts only",
-                    inline=False
-                )
-                
-                embed.add_field(
-                    name="💳 Payment Methods (Gift Cards Only)",
-                    value="🛒 **Amazon Gift Cards** - Most Popular\n📱 **Google Play Cards** - Instant Processing\n💳 **Prepaid Visa/Mastercard** - Universal",
-                    inline=False
-                )
-                
-                embed.add_field(
-                    name="📋 Process",
-                    value="1️⃣ Click purchase button\n2️⃣ Private ticket created\n3️⃣ Send payment\n4️⃣ Accounts delivered to DM",
-                    inline=False
-                )
-                
-                embed.set_footer(text="🚀 Instant delivery • 🔐 Anonymous payments • 💬 24/7 support")
-                
+                # Create shop embed
+                embed = create_shop_embed(available_count, total_count)
                 view = PermanentPurchaseView()
                 
-                # Clear ALL old shop messages from bot
+                # Clear old shop messages from bot (optimized for speed)
                 deleted_count = 0
-                async for message in shop_channel.history(limit=100):
-                    if message.author == bot.user:
-                        try:
-                            await message.delete()
-                            deleted_count += 1
-                        except:
-                            pass
+                try:
+                    # Only check recent messages (last 20) for faster startup
+                    async for message in shop_channel.history(limit=20):
+                        if message.author == bot.user:
+                            try:
+                                await message.delete()
+                                deleted_count += 1
+                            except discord.NotFound:
+                                # Message already deleted
+                                pass
+                            except discord.Forbidden:
+                                # No permissions to delete
+                                break
+                            except Exception as e:
+                                # Other errors - continue but log
+                                debug_print(f"⚠️ Could not delete message: {e}")
+                                break
+                except Exception as e:
+                    debug_print(f"⚠️ Error during message cleanup: {e}")
                 
-                print(f"Deleted {deleted_count} old messages")
+                debug_print(f"Deleted {deleted_count} old messages")
                 
                 shop_message = await shop_channel.send(embed=embed, view=view)
-                print(f"✅ Shop message posted in {shop_channel.mention}")
+                debug_print(f"✅ Shop message posted in {shop_channel.mention}")
                 
             else:
-                print(f"❌ Could not find 'order-ticket' channel")
+                debug_print(f"❌ Could not find '{Config.SHOP_CHANNEL_NAME}' channel")
                 
     except Exception as e:
-        print(f"❌ Error setting up shop: {e}")
+        debug_print(f"❌ Error setting up shop: {e}")
     
     # Background tasks disabled per user request
     # Reservations will NOT auto-expire - admin must manually approve/reject all orders
-    print("ℹ️ Automatic reservation cleanup DISABLED - accounts stay reserved until admin acts")
+    debug_print("ℹ️ Automatic reservation cleanup DISABLED - accounts stay reserved until admin acts")
     
     # Keep-alive handled by UptimeRobot - no Discord messages needed
-    print("✅ Bot keep-alive managed by UptimeRobot")
+    debug_print("✅ Bot keep-alive managed by UptimeRobot")
         
-    print("🎯 Bot is ready! Shop is live and users can start purchasing!")
+    debug_print("🎯 Bot is ready! Shop is live and users can start purchasing!")
     
     # Debug admin channel
-    print(f"Looking for admin channel with ID: {Config.ADMIN_CHANNEL_ID}")
+    debug_print(f"Looking for admin channel with ID: {Config.ADMIN_CHANNEL_ID}")
     admin_channel = bot.get_channel(Config.ADMIN_CHANNEL_ID)
     if admin_channel:
-        print(f"✅ Found admin channel: {admin_channel.name} ({admin_channel.id})")
+        debug_print(f"✅ Found admin channel: {admin_channel.name} ({admin_channel.id})")
         try:
             test_embed = discord.Embed(
                 title="🤖 Bot Started",
@@ -903,18 +932,23 @@ async def on_ready():
                 color=discord.Color.green()
             )
             await admin_channel.send(embed=test_embed)
-            print("✅ Successfully sent test message to admin channel")
+            debug_print("✅ Successfully sent test message to admin channel")
         except Exception as e:
-            print(f"❌ Error sending to admin channel: {e}")
+            debug_print(f"❌ Error sending to admin channel: {e}")
     else:
-        print(f"❌ Admin channel not found with ID: {Config.ADMIN_CHANNEL_ID}")
+        debug_print(f"❌ Admin channel not found with ID: {Config.ADMIN_CHANNEL_ID}")
         guild = bot.get_guild(Config.GUILD_ID)
         if guild:
-            print("Available channels:")
+            debug_print("Available channels:")
             for channel in guild.text_channels:
-                print(f"  - {channel.name} ({channel.id})")
+                debug_print(f"  - {channel.name} ({channel.id})")
         else:
-            print("❌ Guild not found either!")
+            debug_print("❌ Guild not found either!")
+    
+    # Show initialization timing
+    end_time = asyncio.get_event_loop().time()
+    init_duration = round(end_time - start_time, 2)
+    debug_print(f"🕒 Bot initialization completed in {init_duration} seconds")
 
 async def update_shop_message(guild):
     """Update the shop message with current stock count"""
@@ -927,7 +961,7 @@ async def update_shop_message(guild):
                 break
         
         if not shop_channel:
-            print("Shop channel not found for update")
+            debug_print("Shop channel not found for update")
             return
         
         # Get current stats
@@ -979,10 +1013,10 @@ async def update_shop_message(guild):
             # Update the message with same view
             view = PermanentPurchaseView()
             await shop_message.edit(embed=embed, view=view)
-            print(f"Updated shop message with {stats['available']} available accounts")
+            debug_print(f"Updated shop message with {stats['available']} available accounts")
         
     except Exception as e:
-        print(f"Error updating shop message: {e}")
+        debug_print(f"Error updating shop message: {e}")
 
 @bot.tree.command(name="shop", description="Display the account shop")
 async def shop_command(interaction: discord.Interaction):
@@ -1245,10 +1279,10 @@ async def cleanup_expired_reservations():
             guild = bot.get_guild(Config.GUILD_ID)
             if guild:
                 await update_shop_message(guild)
-                print(f"Updated shop: {old_count['available']} → {new_count['available']} available")
+                debug_print(f"Updated shop: {old_count['available']} → {new_count['available']} available")
             
     except Exception as e:
-        print(f"Error in cleanup task: {e}")
+        debug_print(f"Error in cleanup task: {e}")
 
 
 # Removed check_payments task to reduce server load
@@ -1289,7 +1323,7 @@ async def start_web_server():
     await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', port)
     await site.start()
-    print(f"✅ Keep-alive server running on port {port}")
+    debug_print(f"✅ Keep-alive server running on port {port}")
 
 async def start_bot_with_server():
     """Start both Discord bot and HTTP server"""
@@ -1299,43 +1333,30 @@ async def start_bot_with_server():
         await start_web_server()
         debug_print("✅ HTTP server started")
         
-        # Start Discord bot with timeout
+        # Start Discord bot properly - no timeout needed
         debug_print(f"🤖 Connecting to Discord with token: {Config.DISCORD_TOKEN[:20]}...")
-        
-        # Add more debugging for connection issues
         debug_print("🔍 Attempting Discord connection...")
         debug_print(f"🔧 Bot intents: {bot.intents}")
         debug_print(f"🔧 Bot prefix: {bot.command_prefix}")
         
-        try:
-            # Add timeout to prevent hanging - increased for Render network issues
-            await asyncio.wait_for(bot.start(Config.DISCORD_TOKEN), timeout=60.0)
-            debug_print("✅ Discord bot connected successfully!")
-        except asyncio.TimeoutError:
-            debug_print("❌ TIMEOUT: Discord connection took longer than 60 seconds")
-            debug_print("❌ This suggests network issues or invalid Discord token")
-            debug_print("❌ Check: 1) Token validity 2) Bot still in server 3) Network connectivity")
-            raise
-        except discord.LoginFailure as e:
-            debug_print("❌ INVALID DISCORD TOKEN: Authentication failed")
-            debug_print(f"❌ Token used: {Config.DISCORD_TOKEN[:20]}...")
-            debug_print(f"❌ Login error: {e}")
-            raise
-        except discord.HTTPException as e:
-            debug_print(f"❌ Discord HTTP error: {e}")
-            debug_print(f"❌ Status: {e.status}, Response: {e.response}")
-            raise
-        except Exception as discord_error:
-            debug_print(f"❌ Discord connection failed: {discord_error}")
-            debug_print(f"❌ Error type: {type(discord_error).__name__}")
-            import traceback
-            debug_print(f"❌ Connection traceback: {traceback.format_exc()}")
-            raise
+        # Start the bot - this runs indefinitely and includes on_ready processing
+        debug_print("🚀 Starting Discord bot (this will run indefinitely)...")
+        await bot.start(Config.DISCORD_TOKEN)
         
+    except discord.LoginFailure as e:
+        debug_print("❌ INVALID DISCORD TOKEN: Authentication failed")
+        debug_print(f"❌ Token used: {Config.DISCORD_TOKEN[:20]}...")
+        debug_print(f"❌ Login error: {e}")
+        raise
+    except discord.HTTPException as e:
+        debug_print(f"❌ Discord HTTP error: {e}")
+        debug_print(f"❌ Status: {e.status}, Response: {e.response}")
+        raise
     except Exception as e:
         debug_print(f"❌ Error starting bot: {e}")
         import traceback
         debug_print(f"❌ Full traceback: {traceback.format_exc()}")
+        raise
     finally:
         await payment_handler.close()
 
