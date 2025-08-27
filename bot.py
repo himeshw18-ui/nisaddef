@@ -1347,8 +1347,17 @@ async def admin_chat_command(interaction: discord.Interaction, channel: discord.
     except Exception as e:
         await interaction.response.send_message(f"❌ Error: {str(e)}", ephemeral=True)
 
-@bot.tree.command(name="send_instructions", description="Send purchase instructions to announcement channel (Admin only)")
-async def send_instructions_command(interaction: discord.Interaction, channel: discord.TextChannel = None):
+@bot.tree.command(name="send_instructions", description="Send customizable purchase instructions (Admin only)")
+async def send_instructions_command(
+    interaction: discord.Interaction, 
+    channel: discord.TextChannel = None,
+    title: str = "📋 How to Purchase Accounts - Complete Guide",
+    description: str = "Follow these simple steps to purchase accounts through our automated bot system:",
+    product_name: str = "accounts",
+    support_info: str = "Message admin directly",
+    footer_text: str = "🚀 Automated system • 🔐 Secure payments • 💬 24/7 support",
+    currency_info: str = "USD ($) or Indian Rupees (₹)"
+):
     """Send comprehensive instructions for account purchase through the bot"""
     if interaction.user.id != Config.ADMIN_USER_ID:
         await interaction.response.send_message("❌ You don't have permission to use this command.", ephemeral=True)
@@ -1360,20 +1369,20 @@ async def send_instructions_command(interaction: discord.Interaction, channel: d
         
         # Create comprehensive instructions embed
         embed = discord.Embed(
-            title="📋 How to Purchase Accounts - Complete Guide",
-            description="Follow these simple steps to purchase accounts through our automated bot system:",
+            title=title,
+            description=description,
             color=discord.Color.blue()
         )
         
         embed.add_field(
             name="🚀 Step 1: Start Purchase",
-            value="• Look for the **shop message** with purchase buttons\n• Click on your desired quantity (2, 5, 10, or Custom)\n• A **private ticket** will be created for you automatically",
+            value=f"• Look for the **shop message** with purchase buttons\n• Click on your desired quantity (2, 5, 10, or Custom)\n• A **private ticket** will be created for you automatically",
             inline=False
         )
         
         embed.add_field(
             name="🎁 Step 2: Prepare Gift Card",
-            value="• Get a **gift card** in **USD ($)** or **Indian Rupees (₹)**\n• Accepted: Amazon, Google Play, Prepaid Visa/Mastercard\n• Make sure the card has sufficient balance for your order",
+            value=f"• Get a **gift card** in **{currency_info}**\n• Accepted: Amazon, Google Play, Prepaid Visa/Mastercard\n• Make sure the card has sufficient balance for your order",
             inline=False
         )
         
@@ -1384,20 +1393,20 @@ async def send_instructions_command(interaction: discord.Interaction, channel: d
         )
         
         embed.add_field(
-            name="✅ Step 4: Get Your Accounts",
-            value="• Admin will **verify your gift card** (usually within minutes)\n• Once approved, accounts are **delivered instantly**\n• You'll receive accounts in a **private channel** + **DM backup**\n• Each account includes email and password",
+            name=f"✅ Step 4: Get Your {product_name.title()}",
+            value=f"• Admin will **verify your gift card** (usually within minutes)\n• Once approved, {product_name} are **delivered instantly**\n• You'll receive {product_name} in a **private channel** + **DM backup**\n• Each account includes email and password",
             inline=False
         )
         
         embed.add_field(
             name="💡 Important Tips",
-            value="• **Only gift cards accepted** - no crypto, PayPal, etc.\n• **USD ($) or Indian Rupees (₹)** only\n• Keep your **gift card receipt** until order is completed\n• Check your **DMs** for account delivery notifications",
+            value=f"• **Only gift cards accepted** - no crypto, PayPal, etc.\n• **{currency_info}** only\n• Keep your **gift card receipt** until order is completed\n• Check your **DMs** for {product_name} delivery notifications",
             inline=False
         )
         
         embed.add_field(
             name="🆘 Need Help?",
-            value="• **Bot not responding?** Try again in a few minutes\n• **Gift card rejected?** Double-check the code and try again\n• **Other issues?** Message admin directly\n• All purchases are **manually verified** for security",
+            value=f"• **Bot not responding?** Try again in a few minutes\n• **Gift card rejected?** Double-check the code and try again\n• **Other issues?** {support_info}\n• All purchases are **manually verified** for security",
             inline=False
         )
         
@@ -1407,24 +1416,96 @@ async def send_instructions_command(interaction: discord.Interaction, channel: d
             inline=False
         )
         
-        embed.set_footer(text="🚀 Automated system • 🔐 Secure payments • 💬 24/7 support")
+        embed.set_footer(text=footer_text)
         
         # Send to target channel
         await target_channel.send(embed=embed)
         
-        # Confirm to admin
+        # Confirm to admin with customization details
         confirm_embed = discord.Embed(
             title="✅ Instructions Sent",
-            description=f"Purchase instructions have been sent to {target_channel.mention}",
+            description=f"Customized purchase instructions have been sent to {target_channel.mention}",
             color=discord.Color.green()
         )
+        
+        # Show customizations used (only if different from defaults)
+        customizations = []
+        if title != "📋 How to Purchase Accounts - Complete Guide":
+            customizations.append(f"**Title:** {title}")
+        if product_name != "accounts":
+            customizations.append(f"**Product:** {product_name}")
+        if support_info != "Message admin directly":
+            customizations.append(f"**Support:** {support_info}")
+        if currency_info != "USD ($) or Indian Rupees (₹)":
+            customizations.append(f"**Currencies:** {currency_info}")
+        if footer_text != "🚀 Automated system • 🔐 Secure payments • 💬 24/7 support":
+            customizations.append(f"**Footer:** {footer_text[:50]}...")
+            
+        if customizations:
+            confirm_embed.add_field(
+                name="🎨 Customizations Applied",
+                value="\n".join(customizations),
+                inline=False
+            )
+        else:
+            confirm_embed.add_field(
+                name="📋 Content",
+                value="Default instructions sent",
+                inline=False
+            )
+            
         await interaction.response.send_message(embed=confirm_embed, ephemeral=True)
-        debug_print(f"Admin sent purchase instructions to #{target_channel.name}")
+        debug_print(f"Admin sent {'customized ' if customizations else ''}purchase instructions to #{target_channel.name}")
         
     except discord.Forbidden:
         await interaction.response.send_message(f"❌ No permission to send messages in {target_channel.mention}", ephemeral=True)
     except Exception as e:
         await interaction.response.send_message(f"❌ Error: {str(e)}", ephemeral=True)
+
+@bot.tree.command(name="instructions_help", description="Show customization options for send_instructions command (Admin only)")
+async def instructions_help_command(interaction: discord.Interaction):
+    """Show all customization options for the send_instructions command"""
+    if interaction.user.id != Config.ADMIN_USER_ID:
+        await interaction.response.send_message("❌ You don't have permission to use this command.", ephemeral=True)
+        return
+    
+    embed = discord.Embed(
+        title="🎨 Instructions Customization Help",
+        description="Here are all the parameters you can customize in `/send_instructions`:",
+        color=discord.Color.purple()
+    )
+    
+    embed.add_field(
+        name="📝 Basic Options",
+        value="`channel:` Target channel (default: current)\n`title:` Main heading\n`description:` Opening description",
+        inline=False
+    )
+    
+    embed.add_field(
+        name="🛍️ Product Options", 
+        value="`product_name:` What you're selling (default: accounts)\n`currency_info:` Accepted currencies\n`support_info:` How to get help",
+        inline=False
+    )
+    
+    embed.add_field(
+        name="🎨 Appearance",
+        value="`footer_text:` Bottom text of embed",
+        inline=False
+    )
+    
+    embed.add_field(
+        name="💡 Example Usage",
+        value="```/send_instructions channel:#announcements product_name:premium_accounts title:🔥 Premium Account Store support_info:Open a ticket for help```",
+        inline=False
+    )
+    
+    embed.add_field(
+        name="🔧 Default Values",
+        value="• Title: 📋 How to Purchase Accounts - Complete Guide\n• Product: accounts\n• Currency: USD ($) or Indian Rupees (₹)\n• Support: Message admin directly\n• Footer: 🚀 Automated system • 🔐 Secure payments • 💬 24/7 support",
+        inline=False
+    )
+    
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
 async def send_accounts_to_user(user: discord.User, accounts: List[dict], order_id: int):
     """Send account details to user via DM"""
